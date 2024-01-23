@@ -24,11 +24,11 @@ String Opciones_extra[opc_ex] = { "Custom",
 
 bool Botones_actuales[3] = { false, false, false };
 bool Botones_archivados[3] = { false, false, false };
-bool Botones_estados[3] = { false, false, false };
+bool Botones_estados[3] = { false, false, false };  // Verde, rojo, negro
 
 int opc = 0;
 int i;
-int* Cron_pro;
+int* Cronometro_progreso;
 char Tiempo_formato[9];
 
 String cprint_oled(String Original, int Tamano_linea) {
@@ -63,7 +63,7 @@ int* Segundos_a_tiempo(unsigned long unixTime) {
   return timeArray;
 }
 
-void Actualizar_botones(bool Limpiar) {
+void Actualizar_botones(bool Limpiar_pantalla) {
   for (i = 0; i < 3; i++) {
     Botones_actuales[i] = digitalRead(i + 8);
     Botones_estados[i] = false;
@@ -86,14 +86,52 @@ void Actualizar_botones(bool Limpiar) {
       analogWrite(Buzzer, (i * 100) + 100);
       delay(50);
       analogWrite(Buzzer, 0);
-      if (Limpiar) {
+      if (Limpiar_pantalla) {
         oled.clear();
       }
     }
   }
 }
 
-void Temporizador(int Fecha_inicial, int Temporizador_[3]) {  // segundos desde medianoche de 1/1/1970
+void Temporizador(int horas, int minutos, int segundos) {
+  inicio = myRTC.now();
+  Actualizar_botones(true);
+  now = myRTC.now();  // En teoría no se puede llegar hasta aquí sin que la variable esté actualizada, pero de igual manera se actualiza por precaución
+
+  unsigned long fin;
+  fin = inicio.unixtime() + Tiempo_a_segundos(horas, minutos, segundos);
+  bool pausado = false;
+  pausado = false;
+
+  while (!Botones_estados[0] && now.unixtime() <= fin) {
+    now = myRTC.now();
+    Cronometro_progreso = Segundos_a_tiempo(fin - now.unixtime());
+
+    oled.setCursor(0, 0);
+    sprintf(Tiempo_formato, "  %02d:%02d:%02d", Cronometro_progreso[0], Cronometro_progreso[1], Cronometro_progreso[2]);
+    oled.print(Tiempo_formato);
+    Actualizar_botones(false);
+
+    if (Botones_estados[1]) {
+      pausado = true;
+    }
+
+    while (pausado) {
+      Actualizar_botones(false);
+
+      if (Botones_estados[1]) {
+        pausado = false;
+        fin = fin - now.unixtime();
+        now = myRTC.now();
+        fin = now.unixtime() + fin;
+      }
+
+      if (Botones_estados[0]) {
+        Serial.println("Exit");
+        break;
+      }
+    }
+  }
 }
 
 void Temporizador_personalizado() {
@@ -103,14 +141,14 @@ void Temporizador_personalizado() {
 
 void Cronometro() {
   inicio = myRTC.now();
-  Actualizar_botones(false);
-  oled.clear();
+  Actualizar_botones(true);
+
   while (!Botones_estados[0]) {
     now = myRTC.now();
-    Cron_pro = Segundos_a_tiempo(now.unixtime() - inicio.unixtime());
+    Cronometro_progreso = Segundos_a_tiempo(now.unixtime() - inicio.unixtime());
 
     oled.setCursor(0, 0);
-    sprintf(Tiempo_formato, "  %02d:%02d:%02d", Cron_pro[0], Cron_pro[1], Cron_pro[2]);
+    sprintf(Tiempo_formato, "  %02d:%02d:%02d", Cronometro_progreso[0], Cronometro_progreso[1], Cronometro_progreso[2]);
     oled.print(Tiempo_formato);
     Actualizar_botones(true);
   }
@@ -144,22 +182,37 @@ void loop() {
   Actualizar_botones(true);
 
   if (Botones_estados[1]) {
-    opc = (opc + 1) % opc_to;
+    opc++;
   }
 
   if (Botones_estados[2]) {
-    opc = (opc - 1 + opc_to) % opc_to;
+    opc--;
+  }
+
+  if (opc >= opc_to) {
+    opc = 0;
+  }
+
+  if (opc < 0) {
+    opc = opc_to - 1;
   }
 
   oled.setCursor(0, 0);
   if (opc < N_temp) {
-    Cron_pro = Temporizadores[opc];
-    sprintf(Tiempo_formato, "  %02d:%02d:%02d", Cron_pro[0], Cron_pro[1], Cron_pro[2]);
+    Cronometro_progreso = Temporizadores[opc];  // No funciona si no se hace así, no tengo idea de por qué
+    sprintf(Tiempo_formato, "  %02d:%02d:%02d", Cronometro_progreso[0], Cronometro_progreso[1], Cronometro_progreso[2]);
     oled.print(Tiempo_formato);
+
+    if (Botones_estados[0]) {
+      Cronometro_progreso = Temporizadores[opc];  // No funciona si no se hace así, no tengo idea de por qué
+      Temporizador(Cronometro_progreso[0], Cronometro_progreso[1], Cronometro_progreso[2]);
+      oled.clear();
+    }
   } else {
     oled.print(cprint_oled(Opciones_extra[opc - N_temp], 11));
     if (Botones_estados[0]) {
       Funcs[opc - N_temp]();
+      oled.clear();
     }
   }
 }
