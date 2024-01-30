@@ -26,6 +26,8 @@ bool Botones_actuales[3] = { false, false, false };
 bool Botones_archivados[3] = { false, false, false };
 bool Botones_estados[3] = { false, false, false };  // Verde, rojo, negro
 
+int counter = 0;
+unsigned long milisegundos_anteriores = 0;
 int opc = 0;
 int i;
 int* Cronometro_progreso;
@@ -127,10 +129,37 @@ void Temporizador(int horas, int minutos, int segundos) {
       }
 
       if (Botones_estados[0]) {
-        Serial.println("Exit");
         break;
       }
     }
+  }
+
+  if (!Botones_estados[0]) {
+    Actualizar_botones(true);
+    oled.clear();
+    oled.setCursor(0, 0);
+    oled.print(cprint_oled("Done!", 11));
+    while (!Botones_estados[0]) {
+      if (millis() - milisegundos_anteriores > 166) {
+        counter++;
+        milisegundos_anteriores = millis();
+      }
+
+      switch (counter % 6) {
+        case 1:
+          analogWrite(Buzzer, 25);
+          break;
+        case 3:
+          analogWrite(Buzzer, 25);
+          break;
+        default:
+          analogWrite(Buzzer, 0);
+          break;
+      }
+
+      Actualizar_botones(true);
+    }
+    analogWrite(Buzzer, 0);
   }
 }
 
@@ -178,6 +207,8 @@ void setup() {
 
 void loop() {
   now = myRTC.now();
+
+  Serial.println(now.unixtime());
 
   Actualizar_botones(true);
 
