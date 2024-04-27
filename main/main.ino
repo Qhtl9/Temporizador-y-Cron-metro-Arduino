@@ -9,7 +9,7 @@ DateTime inicio;
 
 #define Buzzer 6  // Buzzer pin
 
-#define N_temp 5                // Número de temporizadores
+#define N_temp 6                // Número de temporizadores
 #define opc_ex 2                // Número de opciones extra en el menú (Además de los temporizadores)
 #define opc_to opc_ex + N_temp  // Número de opciones en el menú
 
@@ -17,6 +17,7 @@ int Temporizadores[N_temp][3] = { { 0, 5, 0 },  // Horas, minutos, segundos
                                   { 0, 10, 0 },
                                   { 0, 15, 0 },
                                   { 0, 30, 0 },
+                                  { 0, 45, 0 },
                                   { 1, 0, 0 } };
 
 String Opciones_extra[opc_ex] = { "Custom",
@@ -32,6 +33,10 @@ int opc = 0;
 int i;
 int* Cronometro_progreso;
 char Tiempo_formato[9];
+
+int horas = 0;
+int minutos = 0;
+int segundos = 0;
 
 String cprint_oled(String Original, int Tamano_linea) {
   int pad = (Tamano_linea - Original.length()) / 2;
@@ -71,11 +76,11 @@ void Actualizar_botones(bool Limpiar_pantalla) {
     Botones_estados[i] = false;
     if (Botones_actuales[i] != Botones_archivados[i]) {
       /*Serial.print("Cambio detectado: ");
-      Serial.print(i);
-      Serial.print(" de ");
-      Serial.print(Botones_archivados[i]);
-      Serial.print(" a ");
-      Serial.println(Botones_actuales[i]);*/
+        Serial.print(i);
+        Serial.print(" de ");
+        Serial.print(Botones_archivados[i]);
+        Serial.print(" a ");
+        Serial.println(Botones_actuales[i]);*/
 
       Botones_archivados[i] = Botones_actuales[i];
 
@@ -85,9 +90,9 @@ void Actualizar_botones(bool Limpiar_pantalla) {
     }
 
     if (Botones_estados[i]) {
-      analogWrite(Buzzer, (i * 100) + 100);
-      delay(50);
-      analogWrite(Buzzer, 0);
+      /*analogWrite(Buzzer, (i * 100) + 100);
+        delay(50);
+        analogWrite(Buzzer, 0);*/
       if (Limpiar_pantalla) {
         oled.clear();
       }
@@ -103,7 +108,6 @@ void Temporizador(int horas, int minutos, int segundos) {
   unsigned long fin;
   fin = inicio.unixtime() + Tiempo_a_segundos(horas, minutos, segundos);
   bool pausado = false;
-  pausado = false;
 
   while (!Botones_estados[0] && now.unixtime() <= fin) {
     now = myRTC.now();
@@ -164,9 +168,95 @@ void Temporizador(int horas, int minutos, int segundos) {
 }
 
 void Temporizador_personalizado() {
-  Serial.print("Success 1\n");
-  Serial.println("Success 1.5");
+  horas = 0;
+  minutos = 0;
+  segundos = 0;
+
+  oled.clear();
+  oled.setCursor(0, 0);
+  oled.print("");  // Stuff breaks without this :(
+
+  Actualizar_botones(false);
+  while (!Botones_estados[0]) {
+    // Actualizar los botones
+    Actualizar_botones(false);
+
+    // Incrementar/decrementar horas con los botones
+    if (Botones_estados[2] && horas <= 9) {
+      horas++;
+    }
+
+    if (Botones_estados[1] && horas > 0) {
+      horas--;
+    }
+
+    // Mostrar horas en el display OLED
+    oled.setCursor(0, 2);
+    oled.print("H: " + String(horas));
+  }
+
+  Actualizar_botones(false);
+  while (!Botones_estados[0]) {
+    // Actualizar los botones
+    Actualizar_botones(false);
+
+    // Incrementar/decrementar horas con los botones
+    if (Botones_estados[2]) {
+      minutos += 10;
+    }
+
+    if (Botones_estados[1] && minutos > 0 && minutos - 10 >= 0) {
+      minutos -= 10;
+    }
+
+    // Mostrar horas en el display OLED
+    oled.setCursor(0, 4);
+    oled.print("m: " + String(minutos));
+  }
+
+  Actualizar_botones(false);
+  while (!Botones_estados[0]) {
+    // Actualizar los botones
+    Actualizar_botones(false);
+    // Incrementar/decrementar minutos con los botones
+    if (Botones_estados[2]) {
+      minutos++;
+    }
+
+    if (Botones_estados[1] && minutos > 0) {
+      minutos--;
+    }
+
+    // Mostrar minutos en el display OLED
+    oled.setCursor(0, 4);
+    oled.print("m: " + String(minutos));
+  }
+
+  Actualizar_botones(false);
+  while (!Botones_estados[0]) {
+    // Actualizar los botones
+    Actualizar_botones(false);
+    // Incrementar/decrementar segundos con los botones
+    if (Botones_estados[2]) {
+      segundos++;
+    }
+
+    if (Botones_estados[1] && segundos > 0) {
+      segundos--;
+    }
+
+    // Mostrar segundos en el display OLED
+    oled.setCursor(0, 6);
+    oled.print("s: " + String(segundos));
+  }
+  // Esperar a que el usuario presione el botón de confirmar (botón 0)
+  oled.clear();
+  Serial.println(horas);
+  Serial.println(segundos);
+  Serial.println(minutos);
+  Temporizador(horas, minutos, segundos);
 }
+
 
 void Cronometro() {
   inicio = myRTC.now();
@@ -208,7 +298,7 @@ void setup() {
 void loop() {
   now = myRTC.now();
 
-  Serial.println(now.unixtime());
+  //Serial.println(now.unixtime());
 
   Actualizar_botones(true);
 
